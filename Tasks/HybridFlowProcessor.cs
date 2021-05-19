@@ -5,24 +5,39 @@ namespace Tasks
 {
     public class HybridFlowProcessor<T> : IHybridFlowProcessor<T>
     {
+        private readonly DoublyLinkedList<T> linkedList;
+
+        public HybridFlowProcessor()
+        {
+            linkedList = new DoublyLinkedList<T>();
+        }
+
         public T Dequeue()
         {
-            throw new NotImplementedException();
+            if (linkedList.Length == 0)
+            {
+                throw new InvalidOperationException();
+            }
+            return linkedList.RemoveAt(0);
         }
 
         public void Enqueue(T item)
         {
-            throw new NotImplementedException();
+            linkedList.Add(item);
         }
 
         public T Pop()
         {
-            throw new NotImplementedException();
+            if (linkedList.Length == 0)
+            {
+                throw new InvalidOperationException();
+            }
+            return linkedList.RemoveAt(linkedList.Length - 1);
         }
 
         public void Push(T item)
         {
-            throw new NotImplementedException();
+            linkedList.Add(item);
         }
     }
 }
