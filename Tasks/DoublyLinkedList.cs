@@ -7,9 +7,8 @@ namespace Tasks
 {
     public class DoublyLinkedList<T> : IDoublyLinkedList<T>
     {
-        public int Length { get; private set; }
-        private Node head;
-        private Node tail;
+        public int Length { get; protected set; }
+        private Node<T> root;
         private int version;
 
         public DoublyLinkedList()
@@ -17,6 +16,7 @@ namespace Tasks
         }
 
         public DoublyLinkedList(IEnumerable<T> sequence)
+            : this()
         {
             if (sequence is null)
             {
@@ -31,123 +31,56 @@ namespace Tasks
 
         public void Add(T e)
         {
-            if (tail is null)
+            if (Length == 0)
             {
-                head = tail = new Node(e);
+                root = new Node<T>(e);
+                Length++;
+                version++;
             }
             else
             {
-                tail.NextNode = new Node(e) { PreviousNode = tail };
-                tail = tail.NextNode;
+                Insert(e, root, root.Previous ?? root);
             }
-
-            Length++;
-            version++;
         }
 
         public void AddAt(int index, T e)
         {
-            if (index < 0 || index > Length)
-            {
-                throw new IndexOutOfRangeException();
-            }
-
             if (index == Length)
             {
                 Add(e);
-                return;
-            }
-
-            var node = NodeAt(index);
-            var newNode = new Node(e) { NextNode = node };
-            if (node == head)
-            {
-                head = newNode;
             }
             else
             {
-                node.PreviousNode.NextNode = newNode;
+                var node = NodeAt(index);
+                Insert(e, node, node.Previous);
+                if (index == 0)
+                {
+                    root = root.Previous;
+                }
             }
-
-            node.PreviousNode = newNode;
-            Length++;
-            version++;
         }
 
-        public T ElementAt(int index)
-        {
-            if (index < 0 || index >= this.Length)
-            {
-                throw new IndexOutOfRangeException();
-            }
-
-            return NodeAt(index).Value;
-        }
+        public T ElementAt(int index) => NodeAt(index).Value;
 
         public void Remove(T item)
         {
-            var node = head;
-            while (node != null)
+            var node = root;
+            for (int i = 0; i < Length; i++)
             {
                 if (IsEquals(node.Value, item))
                 {
-                    if (node == head)
-                    {
-                        head = head.NextNode;
-                        head.PreviousNode = null;
-                    }
-                    else if (node == tail)
-                    {
-                        tail = tail.PreviousNode;
-                        tail.NextNode = null;
-                    }
-                    else
-                    {
-                        node.PreviousNode.NextNode = node.NextNode;
-                        node.NextNode.PreviousNode = node.PreviousNode;
-                    }
-
-                    Length--;
-                    version++;
+                    Remove(node);
                     return;
                 }
 
-                node = node.NextNode;
+                node = node.Next;
             }
         }
 
         public T RemoveAt(int index)
         {
-            if (index < 0 || index >= this.Length)
-            {
-                throw new IndexOutOfRangeException();
-            }
-
             var node = NodeAt(index);
-            if (node == head)
-            {
-                head = node.NextNode;
-            }
-
-            if (node == tail)
-            {
-                tail = node.PreviousNode;
-            }
-
-            if (node.NextNode != null)
-            {
-                node.NextNode.PreviousNode = node.PreviousNode;
-            }
-
-            if (node.PreviousNode != null)
-            {
-                node.PreviousNode.NextNode = node.NextNode;
-            }
-
-            node.PreviousNode = null;
-            node.NextNode = null;
-            Length--;
-            version++;
+            Remove(node);
             return node.Value;
         }
 
@@ -155,22 +88,81 @@ namespace Tasks
 
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 
-        public struct Enumerator : IEnumerator<T>
+        private static bool IsEquals(T a, T b) => a?.Equals(b) ?? b == null;
+
+        private void Insert(T e, Node<T> next, Node<T> prev)
+        {
+            var newNode = new Node<T>(e) { Next = next, Previous = prev };
+            next.Previous = newNode;
+            prev.Next = newNode;
+
+            Length++;
+            version++;
+        }
+
+        private void Remove(Node<T> node)
+        {
+            if (node == root)
+            {
+                root = node.Next;
+            }
+
+            if (node.Next != null)
+            {
+                node.Next.Previous = node.Previous;
+            }
+
+            if (node.Previous != null)
+            {
+                node.Previous.Next = node.Next;
+            }
+
+            Length--;
+            version++;
+        }
+
+        private Node<T> NodeAt(int index)
+        {
+            if (index < 0 || index >= Length)
+            {
+                throw new IndexOutOfRangeException();
+            }
+
+            var node = root;
+            if (index < Length / 2)
+            {
+                for (int i = 0; i < index; i++)
+                {
+                    node = node.Next;
+                }
+            }
+            else
+            {
+                for (int i = Length; i > index; i--)
+                {
+                    node = node.Previous;
+                }
+            }
+
+            return node;
+        }
+
+        private struct Enumerator : IEnumerator<T>
         {
             private readonly int version;
-            private readonly DoublyLinkedList<T> list;
-            private Node current;
+            private readonly DoublyLinkedList<T> linkedList;
+            private Node<T> current;
             private int index;
 
-            internal Enumerator(DoublyLinkedList<T> list)
+            internal Enumerator(DoublyLinkedList<T> linkedList)
             {
-                this.list = list ?? throw new ArgumentNullException(nameof(list));
-                version = list.version;
+                this.linkedList = linkedList ?? throw new ArgumentNullException(nameof(linkedList));
+                version = linkedList.version;
                 current = null;
                 index = 0;
             }
 
-            public T Current
+            private T Current
             {
                 get
                 {
@@ -187,13 +179,13 @@ namespace Tasks
             public bool MoveNext()
             {
                 CheckVersion();
-                if (index == list.Length)
+                if (index == linkedList.Length)
                 {
                     current = null;
                     return false;
                 }
 
-                current = index++ == 0 ? list.head : current.NextNode;
+                current = index++ == 0 ? linkedList.root : current.Next;
                 return true;
             }
 
@@ -216,50 +208,10 @@ namespace Tasks
 
             private void CheckVersion()
             {
-                if (version != list.version)
+                if (version != linkedList.version)
                 {
                     throw new InvalidOperationException();
                 }
-            }
-        }
-
-        private static bool IsEquals(T a, T b) => a?.Equals(b) ?? b == null;
-
-        private Node NodeAt(int index)
-        {
-            Node node;
-            if (index <= Length / 2)
-            {
-                node = head;
-                while (--index >= 0)
-                {
-                    node = node.NextNode;
-                }
-
-                return node;
-            }
-
-            node = tail;
-            index = Length - index - 1;
-            while (--index >= 0)
-            {
-                node = node.PreviousNode;
-            }
-
-            return node;
-        }
-
-        private class Node
-        {
-            internal T Value { get; }
-
-            internal Node PreviousNode { get; set; }
-
-            internal Node NextNode { get; set; }
-
-            internal Node(T value)
-            {
-                this.Value = value;
             }
         }
     }
