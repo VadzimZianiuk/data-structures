@@ -39,7 +39,7 @@ namespace Tasks
             }
             else
             {
-                Insert(e, root, root.Previous ?? root);
+                InsertBefore(e, root);
             }
         }
 
@@ -52,7 +52,7 @@ namespace Tasks
             else
             {
                 var node = NodeAt(index);
-                Insert(e, node, node.Previous);
+                InsertBefore(e, node);
                 if (index == 0)
                 {
                     root = root.Previous;
@@ -90,11 +90,12 @@ namespace Tasks
 
         private static bool IsEquals(T a, T b) => a?.Equals(b) ?? b == null;
 
-        private void Insert(T e, Node<T> next, Node<T> prev)
+        private void InsertBefore(T e, Node<T> node)
         {
-            var newNode = new Node<T>(e) { Next = next, Previous = prev };
-            next.Previous = newNode;
-            prev.Next = newNode;
+            var previous = node.Previous ?? node; 
+            var newNode = new Node<T>(e) { Next = node, Previous = previous};
+            previous.Next = newNode;
+            node.Previous = newNode;
 
             Length++;
             version++;
